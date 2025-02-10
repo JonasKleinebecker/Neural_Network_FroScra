@@ -1,0 +1,28 @@
+---
+title: "Linear Regression from Scratch"
+jupyter: python3
+---
+
+## Imports
+```{python}
+import numpy as np
+import math
+```
+## Activation Functions
+```{python}
+class ActivationFunction:
+  def activation(self, input):
+    pass
+
+class Relu:
+  def activation(self, input):
+    if(input < 0):
+      return 0
+    else:
+      return input
+
+class Sigmoid:
+  def activation(self, input):
+    return 1 / (1 + math.exp(-input))
+```
+
