@@ -22,14 +22,15 @@ class Module(ABC):
 class Relu(Module):
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         self.parent = parent
-        self.meaned_input = np.mean(x, axis=0)
-        self.meaned_input = self.meaned_input.reshape(1, -1)
+        self.input = x
         return np.maximum(0, x)
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
-        return np.where(self.meaned_input > 0, parent_input_grad, 0)
+        return np.where(self.input > 0, parent_input_grad, 0)
 
     def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+        if self.parent is None:
+            return
         self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
 
 
@@ -37,15 +38,15 @@ class Sigmoid(Module):
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         self.parent = parent
         self.input = x
-        output = 1 / (1 + np.exp(-x))
-        self.meaned_output = np.mean(output, axis=0)
-        self.meaned_output = self.meaned_output.reshape(1, -1)
-        return output
+        self.output = 1 / (1 + np.exp(-x))
+        return self.output
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
-        return self.meaned_output * (1 - self.meaned_output) * parent_input_grad
+        return self.output * (1 - self.output) * parent_input_grad
 
     def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+        if self.parent is None:
+            return
         self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
 
 
@@ -53,17 +54,28 @@ class Softmax(Module):
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         self.parent = parent
         self.input = x
-        output = np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
-        self.meaned_output = np.mean(output, axis=0)
-        self.meaned_output = self.meaned_output.reshape(1, -1)
-        return output
+        self.output = np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
+        return self.output
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
-        s = self.meaned_output.reshape(-1, 1)
-        jacobian_matrix = np.diagflat(s) - np.dot(s, s.T)
-        return np.dot(jacobian_matrix, parent_input_grad.T).T
+        batch_size, num_classes = parent_input_grad.shape
+        input_grad = np.zeros_like(parent_input_grad)
+
+        # Compute gradient for each sample in the batch
+        for i in range(batch_size):
+            softmax_output = self.output[i].reshape(-1, 1)  # Shape: (num_classes, 1)
+            jacobian_matrix = np.diagflat(softmax_output) - np.dot(
+                softmax_output, softmax_output.T
+            )  # Shape: (num_classes, num_classes)
+            input_grad[i] = np.dot(
+                jacobian_matrix, parent_input_grad[i]
+            )  # Shape: (num_classes,)
+
+        return input_grad
 
     def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+        if self.parent is None:
+            return
         self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
 
 
@@ -80,13 +92,13 @@ class Dense_Layer(Module):
         self.velocity_bias = np.zeros((1, output_size))
         self.has_trainable_weights = has_trainable_weights
         if weights is None:
-            self.weights = np.random.randn(input_size, output_size)
+            self.weights = np.random.randn(input_size, output_size) * 0.01
         else:
             if weights.shape != (input_size, output_size):
                 raise ValueError("Weights shape must be (input_size, output_size)")
             self.weights = weights
         if bias is None:
-            self.bias = np.random.randn(1, output_size)
+            self.bias = np.zeros((1, output_size))
         else:
             if bias.shape != (1, output_size):
                 raise ValueError("Bias shape must be (1, output_size)")
@@ -94,15 +106,14 @@ class Dense_Layer(Module):
 
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         self.parent = parent
-        self.input = np.mean(x, axis=0)
-        self.input = self.input.reshape(1, -1)
+        self.input = x
         return np.dot(x, self.weights) + self.bias
 
     def compute_weight_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
         return np.dot(self.input.T, parent_input_grad)
 
     def compute_bias_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
-        return np.sum(parent_input_grad, axis=0)
+        return np.sum(parent_input_grad, axis=0, keepdims=True)
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
         return np.dot(parent_input_grad, self.weights.T)
@@ -144,16 +155,16 @@ class Categorical_Crossentropy_Loss:
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        return np.sum(y_pred - y_true, axis=0).reshape(1, -1)
+        return y_pred - y_true
 
 
 class MSE_Loss:
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        return np.mean((y_true - y_pred) ** 2, axis=1)
+        return np.mean((y_true - y_pred) ** 2)
 
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        return np.sum(2 * (y_pred - y_true), axis=0)
+        return 2 * (y_pred - y_true)
