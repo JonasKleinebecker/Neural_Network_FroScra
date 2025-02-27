@@ -138,7 +138,8 @@ class Categorical_Crossentropy_Loss:
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        return -np.mean(np.sum(y_true * np.log(y_pred), axis=1))
+        eps = 1e-15
+        return -np.mean(np.sum(y_true * np.log(y_pred + eps), axis=1))
 
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         if y_true.shape != y_pred.shape:
