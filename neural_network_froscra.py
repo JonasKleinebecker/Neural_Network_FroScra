@@ -143,8 +143,7 @@ class Categorical_Crossentropy_Loss:
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        loss_prime = np.mean(y_pred - y_true, axis=0)
-        return np.mean(y_pred - y_true, axis=0).reshape(1, -1)
+        return np.sum(y_pred - y_true, axis=0).reshape(1, -1)
 
 
 class MSE_Loss:
@@ -156,4 +155,4 @@ class MSE_Loss:
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
-        return np.mean(2 * (y_pred - y_true), axis=0)
+        return np.sum(2 * (y_pred - y_true), axis=0)
