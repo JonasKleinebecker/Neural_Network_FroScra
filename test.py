@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from tqdm.auto import tqdm
 
 from neural_network_froscra import (
     Categorical_Crossentropy_Loss,
@@ -42,40 +43,7 @@ class LinearRegression:
         return x
 
 
-def dummy_data():
-    target_weight = 0.8
-    target_bias = 0.2
-
-    X_train = np.arange(0, 1, 0.25).reshape(-1, 1)
-    y_train = target_weight * X_train + target_bias
-
-    plt.plot(X_train, y_train)
-    # plt.show()
-
-    model = LinearRegression()
-    print(f"Initial Weights: {model.layer.weights}")
-    loss_fn = MSE_Loss()
-
-    print(f"X_train: \n{X_train}")
-    print(f"y_train: \n{y_train}")
-
-    for epoch in range(2000):
-        print(f"Epoch {epoch}")
-        print(f"Weights: {model.layer.weights}")
-        print(f"Bias: {model.layer.bias}")
-        y_pred = model.forward(X_train)
-        print(f"y_pred: \n{y_pred}")
-        loss = loss_fn.loss(y_train, y_pred)
-        print(f"Loss: {loss}")
-        loss_prime = loss_fn.loss_prime(y_train, y_pred)
-        print(f"Loss Prime: {loss_prime}")
-        model.layer.loss_backwards(loss_prime)
-    print(f"Final Weights: {model.layer.weights}")
-    print(f"Final Bias: {model.layer.bias}")
-
-
 def main():
-    # prep data
     X, y = load_iris(return_X_y=True)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -98,17 +66,33 @@ def main():
     loss = Categorical_Crossentropy_Loss()
 
     batch_size = 32
-    # train model
     for epoch in range(1000):
         print(f"Epoch {epoch}")
-        for i in range(0, len(X_train), batch_size):
+
+        total_loss = 0.0
+        total_accuracy = 0.0
+        num_batches = 0
+
+        # Use tqdm to show progress for each batch
+        for i in tqdm(range(0, len(X_train), batch_size)):
             X_batch = X_train[i : i + batch_size]
             y_batch = y_train[i : i + batch_size]
+
             y_pred = model.forward(X_batch)
-            print(f"accuracy: {accuracy(y_batch, y_pred)}")
-            loss_value = loss.loss(y_batch, y_pred)
-            print(f"Loss: {loss_value}")
-            model.softmax.loss_backwards(loss.loss_prime(y_batch, y_pred))
+            batch_accuracy = accuracy(y_batch, y_pred)
+            batch_loss = loss.loss(y_batch, y_pred)
+
+            total_loss += batch_loss
+            total_accuracy += batch_accuracy
+            num_batches += 1
+
+            model.softmax.backward(loss.loss_prime(y_batch, y_pred))
+
+        avg_loss = total_loss / num_batches
+        avg_accuracy = total_accuracy / num_batches
+
+        print(f"Average Loss: {avg_loss}")
+        print(f"Average Accuracy: {avg_accuracy}")
 
 
 if __name__ == "__main__":
