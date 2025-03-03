@@ -6,62 +6,111 @@ import numpy as np
 
 
 class Module(ABC):
+    """
+    Abstract class for a module in a neural network.
+    A module is a layer or an activation function.
+    """
+
     @abstractmethod
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
+        """
+        Forward pass of the module.
+        """
         pass
 
     @abstractmethod
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Backward pass of the module.
+        """
         pass
 
     @abstractmethod
-    def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+    def backward(self, parent_input_grad: np.ndarray) -> None:
+        """
+        Backward pass of the module.
+        """
         pass
 
 
 class Relu(Module):
+    """
+    Rectified Linear Unit(ReLU) activation function class.
+    """
+
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
+        """
+        Forward pass of the ReLU activation function.
+        """
         self.parent = parent
         self.input = x
         return np.maximum(0, x)
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Calculate and return the input gradient of the ReLU activation function.
+        """
         return np.where(self.input > 0, parent_input_grad, 0)
 
-    def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+    def backward(self, parent_input_grad: np.ndarray) -> None:
+        """
+        Backward pass of the ReLU activation function.
+        """
         if self.parent is None:
             return
-        self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
+        self.parent.backward(self.compute_input_grad(parent_input_grad))
 
 
 class Sigmoid(Module):
+    """
+    Sigmoid activation function class.
+    """
+
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
+        """
+        Forward pass of the Sigmoid activation function.
+        """
         self.parent = parent
         self.input = x
         self.output = 1 / (1 + np.exp(-x))
         return self.output
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Calculate and return the input gradient of the Sigmoid activation function.
+        """
         return self.output * (1 - self.output) * parent_input_grad
 
-    def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+    def backward(self, parent_input_grad: np.ndarray) -> None:
+        """
+        Backward pass of the Sigmoid activation function.
+        """
         if self.parent is None:
             return
-        self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
+        self.parent.backward(self.compute_input_grad(parent_input_grad))
 
 
 class Softmax(Module):
+    """
+    Softmax activation function class.
+    """
+
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
+        """
+        Forward pass of the Softmax activation function.
+        """
         self.parent = parent
         self.input = x
         self.output = np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True)
         return self.output
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
-        batch_size, num_classes = parent_input_grad.shape
+        """
+        Calculate and return the input gradient of the Softmax activation function.
+        """
+        batch_size, _ = parent_input_grad.shape
         input_grad = np.zeros_like(parent_input_grad)
 
-        # Compute gradient for each sample in the batch
         for i in range(batch_size):
             softmax_output = self.output[i].reshape(-1, 1)  # Shape: (num_classes, 1)
             jacobian_matrix = np.diagflat(softmax_output) - np.dot(
@@ -73,13 +122,20 @@ class Softmax(Module):
 
         return input_grad
 
-    def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+    def backward(self, parent_input_grad: np.ndarray) -> None:
+        """
+        Backward pass of the Softmax activation function.
+        """
         if self.parent is None:
             return
-        self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
+        self.parent.backward(self.compute_input_grad(parent_input_grad))
 
 
 class Dense_Layer(Module):
+    """
+    Dense layer class.
+    """
+
     def __init__(
         self,
         input_size: int,
@@ -105,17 +161,30 @@ class Dense_Layer(Module):
             self.bias = bias
 
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
+        """
+        Forward pass of the dense layer.
+        """
+        self.output = x
         self.parent = parent
         self.input = x
         return np.dot(x, self.weights) + self.bias
 
     def compute_weight_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Calculate and return the weight gradient of the dense layer.
+        """
         return np.dot(self.input.T, parent_input_grad)
 
     def compute_bias_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Calculate and return the bias gradient of the dense layer.
+        """
         return np.sum(parent_input_grad, axis=0, keepdims=True)
 
     def compute_input_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
+        """
+        Calculate and return the input gradient of the dense layer.
+        """
         return np.dot(parent_input_grad, self.weights.T)
 
     def SGD_step(
@@ -125,6 +194,9 @@ class Dense_Layer(Module):
         weights_grad: np.ndarray,
         bias_grad: np.ndarray,
     ) -> None:
+        """
+        Perform a Stochastic Gradient Descent (SGD) step for the dense layer.
+        """
         self.velocity_weights = (
             momentum * self.velocity_weights - learning_rate * weights_grad
         )
@@ -132,7 +204,10 @@ class Dense_Layer(Module):
         self.weights += self.velocity_weights
         self.bias += self.velocity_bias
 
-    def loss_backwards(self, parent_input_grad: np.ndarray) -> None:
+    def backward(self, parent_input_grad: np.ndarray) -> None:
+        """
+        Backward pass of the loss function for the dense layer.
+        """
         if self.has_trainable_weights:
             self.SGD_step(
                 learning_rate=0.01,
@@ -142,29 +217,56 @@ class Dense_Layer(Module):
             )
         if self.parent is None:
             return
-        self.parent.loss_backwards(self.compute_input_grad(parent_input_grad))
+        self.parent.backward(self.compute_input_grad(parent_input_grad))
 
 
 class Categorical_Crossentropy_Loss:
+    """
+    Categorical Crossentropy loss class.
+    """
+
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        Calculate the categorical crossentropy loss.
+        """
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
         eps = 1e-15
         return -np.mean(np.sum(y_true * np.log(y_pred + eps), axis=1))
 
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+        """
+        Calculate the derivative of the categorical crossentropy loss.
+        """
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
         return y_pred - y_true
 
 
 class MSE_Loss:
+    """
+    Mean Squared Error loss class.
+    """
+
     def loss(self, y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        Calculate the mean squared error loss.
+        """
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
         return np.mean((y_true - y_pred) ** 2)
 
     def loss_prime(self, y_true: np.ndarray, y_pred: np.ndarray) -> np.ndarray:
+        """
+        Calculate the derivative of the mean squared error loss.
+        """
         if y_true.shape != y_pred.shape:
             raise ValueError("y_true and y_pred must have the same shape")
         return 2 * (y_pred - y_true)
+
+
+def accuracy(y_true, y_pred):
+    """
+    Calculate the accuracy for a given set of true and predicted labels.
+    """
+    return np.mean(np.argmax(y_true, axis=1) == np.argmax(y_pred, axis=1))

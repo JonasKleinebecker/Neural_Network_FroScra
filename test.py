@@ -11,6 +11,7 @@ from neural_network_froscra import (
     Relu,
     Sigmoid,
     Softmax,
+    accuracy,
 )
 
 
@@ -104,6 +105,7 @@ def main():
             X_batch = X_train[i : i + batch_size]
             y_batch = y_train[i : i + batch_size]
             y_pred = model.forward(X_batch)
+            print(f"accuracy: {accuracy(y_batch, y_pred)}")
             loss_value = loss.loss(y_batch, y_pred)
             print(f"Loss: {loss_value}")
             model.softmax.loss_backwards(loss.loss_prime(y_batch, y_pred))
