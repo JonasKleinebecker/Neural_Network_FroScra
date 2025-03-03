@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 
@@ -38,6 +39,13 @@ class Relu(Module):
     Rectified Linear Unit(ReLU) activation function class.
     """
 
+    def __init__(self):
+        """
+        Initialize the ReLU activation function.
+        """
+        self.parent: Optional[Module] = None
+        self.input: Optional[np.ndarray] = None
+
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         """
         Forward pass of the ReLU activation function.
@@ -50,6 +58,8 @@ class Relu(Module):
         """
         Calculate and return the input gradient of the ReLU activation function.
         """
+        if self.input is None:
+            raise ValueError("compute_input_grad called before forward pass")
         return np.where(self.input > 0, parent_input_grad, 0)
 
     def backward(self, parent_input_grad: np.ndarray) -> None:
@@ -66,6 +76,14 @@ class Sigmoid(Module):
     Sigmoid activation function class.
     """
 
+    def __init__(self):
+        """
+        Initialize the Sigmoid activation function.
+        """
+        self.parent: Optional[Module] = None
+        self.input: Optional[np.ndarray] = None
+        self.output: Optional[np.ndarray] = None
+
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         """
         Forward pass of the Sigmoid activation function.
@@ -79,6 +97,8 @@ class Sigmoid(Module):
         """
         Calculate and return the input gradient of the Sigmoid activation function.
         """
+        if self.output is None:
+            raise ValueError("compute_input_grad called before forward pass")
         return self.output * (1 - self.output) * parent_input_grad
 
     def backward(self, parent_input_grad: np.ndarray) -> None:
@@ -94,6 +114,14 @@ class Softmax(Module):
     """
     Softmax activation function class.
     """
+
+    def __init__(self):
+        """
+        Initialize the Softmax activation function.
+        """
+        self.parent: Optional[Module] = None
+        self.input: Optional[np.ndarray] = None
+        self.output: np.ndarray
 
     def forward(self, x: np.ndarray, parent: Module | None) -> np.ndarray:
         """
@@ -144,6 +172,12 @@ class Dense_Layer(Module):
         weights: np.ndarray | None = None,
         bias: np.ndarray | None = None,
     ):
+        """
+        Initialize the Dense layer.
+        """
+        self.parent: Optional[Module] = None
+        self.input: Optional[np.ndarray] = None
+        self.output: np.ndarray
         self.velocity_weights = np.zeros((input_size, output_size))
         self.velocity_bias = np.zeros((1, output_size))
         self.has_trainable_weights = has_trainable_weights
@@ -173,6 +207,8 @@ class Dense_Layer(Module):
         """
         Calculate and return the weight gradient of the dense layer.
         """
+        if self.input is None:
+            raise ValueError("compute_weight_grad called before forward pass")
         return np.dot(self.input.T, parent_input_grad)
 
     def compute_bias_grad(self, parent_input_grad: np.ndarray) -> np.ndarray:
